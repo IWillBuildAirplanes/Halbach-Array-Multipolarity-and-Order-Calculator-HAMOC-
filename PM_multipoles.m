@@ -1,61 +1,38 @@
-clear all;  close all
+clear all;  close all; clc
+pkg load symbolic
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Configure variables
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 limit = 0.5;       % limit drawing of arrows
 BrMax = 1.0;       % remanent field [T]
-k = 0.5;  % degrading coefficient
+k = 0.1;           % degrading coefficient
 Width = 1;         % Width of the cube [MagnetsNum]
 ArrayRadius = 2;   % outwards radial displacement of cube
 MagnetsNum = 8;    % number of cubes
 Multipolarity = 1; % multipolarity (m = 1: dipole, 2: quadrupole)
-GraphsOn = 0;
+GraphsOn = 1;
 
-if exist('tmp/') ~=  7, mkdir('tmp'); end
+if exist('tmp/') ~= 7, mkdir('tmp'); end
 fn = sprintf('tmp/MagnetsNum%02d_Multipolarity%1d_w%02d_ArrayRadius%02d',
   MagnetsNum, Multipolarity, Width, ArrayRadius
 );
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Antiarray strength fucntion definition
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Antiarray magnets' strengths
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 theta_grid = 0:360 / MagnetsNum:360 - 360 / MagnetsNum;
-
-function H = antistrength(theta, BrMax, k)
-  if theta < 30
-  H = 0.0;
-  elseif theta < 90
-  H = 0.25 * k * BrMax;
-  elseif theta < 150
-  H = 0.5 * k * BrMax;
-  elseif theta < 165
-  H = 0.75 * k * BrMax;
-  elseif theta < 180
-  H = 1.0 * k * BrMax;
-  elseif theta < 195
-  H = 1.0 * k * BrMax;
-  elseif theta < 210
-  H = 0.75 * k * BrMax;
-  elseif theta < 270
-  H = 0.5 * k * BrMax;
-  elseif theta < 300
-  H = 0.25 * k * BrMax;
-  else
-  H = 0;
-  end
-end
 
 Br = [];
 for n = 1:length(theta_grid)
   Br = [Br, antistrength(theta_grid(n), BrMax, k)];
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Generate an anti-array matrix with rows for cubes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for n = 0:MagnetsNum - 1
   cube = make_cubez(Width, 1, Br(n + 1));
@@ -71,13 +48,13 @@ for n = 0:MagnetsNum - 1
   end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Plot anti-array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if GraphsOn == 1
-figure
-hold on
+  figure
+  hold on
 end
 
 if GraphsOn == 1
@@ -95,9 +72,9 @@ end
 
 axis equal
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate multipole coefficients of anti-array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 AntiMPoleCoeffs = [0, 0, 0, 0, 0];
 AntiMPoleNum = length(AntiMPoleCoeffs);
@@ -111,11 +88,11 @@ for n = 0:1:AntiMPoleNum - 1
   BList = [BList, BListVec(1) + BListVec(2) * i];
 end
 
-AntiMPoleCoeffs = (fft(-conj(i * BList)) / AntiMPoleNum); % .* (10 .^ [2, 4, 6, 8, 10])
+AntiMPoleCoeffs = (fft(-conj(i * BList)) / AntiMPoleNum);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Add field recreated from multipole coefficients
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [xgrid, ygrid] = meshgrid(
   -(ArrayRadius - Width / 2):0.2:(ArrayRadius - Width / 2)
@@ -136,9 +113,9 @@ if GraphsOn == 1
     'LineWidth', 2, 'Color', 'b');
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Generate a nominal array matrix with rows for cubes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for n = 0:MagnetsNum - 1
   cube = make_cubez(Width, 1, 1);
@@ -154,13 +131,13 @@ for n = 0:MagnetsNum - 1
   end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Plot nominal array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if GraphsOn == 1
-figure
-hold on
+  figure
+  hold on
 end
 
 if GraphsOn == 1
@@ -178,9 +155,9 @@ end
 
 axis equal
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate multipole coefficients of nominal array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 NomMPoleCoeffs = [0, 0, 0, 0, 0];
 NomMPoleNum = length(NomMPoleCoeffs);
@@ -196,15 +173,15 @@ end
 
 NomMPoleCoeffs = fft(-conj(i * BList)) / NomMPoleNum;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate multipole coefficients of degraded array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 DegMPoleCoeffs = AntiMPoleCoeffs + NomMPoleCoeffs;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PRint multipole coefficients
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Print multipole coefficients
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 NomMPoleCoeffsMod = abs(NomMPoleCoeffs);
 NomMPoleCoeffsArg = arg(NomMPoleCoeffs) * 360 / (2 * pi);

@@ -13,21 +13,85 @@ ArrayRadius = 2;   % outwards radial displacement of cube
 MagnetsNum = 8;    % number of cubes
 Multipolarity = 1; % multipolarity (m = 1: dipole, 2: quadrupole)
 GraphsOn = 1;
+xGrid = -(ArrayRadius - Width / 2):0.2:(ArrayRadius - Width / 2);
+yGrid = xGrid;
+zGrid = 0;
 
 if exist('tmp/') ~= 7, mkdir('tmp'); end
 fn = sprintf('tmp/MagnetsNum%02d_Multipolarity%1d_w%02d_ArrayRadius%02d',
   MagnetsNum, Multipolarity, Width, ArrayRadius
 );
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Generate a nominal array matrix with rows for cubes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for n = 0:MagnetsNum - 1
+  cube = make_cubez(Width, 1, 1);
+  cubey = sheets_rotate_x(cube, -90);
+
+  tmp = sheets_rotate_z(cubey, -n * Multipolarity * 360 / MagnetsNum);
+  tmp = sheets_translate(tmp, [ArrayRadius; 0; 0]);
+  tmp = sheets_rotate_z(tmp, -n * 360 / MagnetsNum);
+  if n == 0
+    NomSheets = tmp;
+  else
+    NomSheets = [NomSheets; tmp];
+  end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plot nominal array
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if GraphsOn == 1
+  figure
+  title("Nominal Array Field")
+
+  hold on
+
+  for m = 1:size(NomSheets, 1)
+    draw_sheets(NomSheets(m, :))
+  end
+
+  [NomFieldX, NomFieldY, NomFieldZ] = field_from_sheets3(xGrid, yGrid, zGrid, NomSheets, limit, 'r');
+
+  axis equal
+  view(0, 90)
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Calculate multipole coefficients of nominal array
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+NomMPoleNum = 5;
+NomMPoleCoeffs = zeros(1, NomMPoleNum);
+
+NomFieldTestValues = [];
+NomFieldTestEntry = zeros(3, 1);
+
+for n = 0:1:NomMPoleNum - 1
+  TestPosComplex = exp(2 * pi * i * n / NomMPoleNum);
+  TestPosVector = [real(TestPosComplex); imag(TestPosComplex); 0];
+  NomFieldTestEntry = Bsheets(NomSheets, TestPosVector);
+  NomFieldTestValues = [
+    NomFieldTestValues,
+    NomFieldTestEntry(1) + NomFieldTestEntry(2) * i
+  ];
+end
+
+NomMPoleCoeffs = fft(-conj(i * NomFieldTestValues)) / NomMPoleNum;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Antiarray magnets' strengths
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-theta_grid = 0:360 / MagnetsNum:360 - 360 / MagnetsNum;
+ThetaGrid = 0:360 / MagnetsNum:360 - 360 / MagnetsNum;
 
 Br = [];
-for n = 1:length(theta_grid)
-  Br = [Br, antistrength(theta_grid(n), BrMax, k)];
+for n = 1:length(ThetaGrid)
+  Br = [Br, antistrength(ThetaGrid(n), BrMax, k)];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -54,51 +118,46 @@ end
 
 if GraphsOn == 1
   figure
-  hold on
-end
+  title("Antiarray Field (Red) and Recreated Field from MPole Coefficients (Blue)")
 
-if GraphsOn == 1
+  hold on
+
   for m = 1:size(AntiSheets, 1)
     draw_sheets(AntiSheets(m, :))
   end
+
+  AntiField = field_from_sheets3(xGrid, yGrid, zGrid, AntiSheets, limit, 'r');
+  axis equal
+  view(0, 90)
 end
-
-gridpoints = -(ArrayRadius - Width / 2):0.2:(ArrayRadius - Width / 2);
-gx = gridpoints;  gy = gx;  gz = 0;   % in xy-plane
-
-if GraphsOn == 1
-  field_from_sheets3(gx, gy, gz, AntiSheets, limit)
-end
-
-axis equal
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate multipole coefficients of anti-array
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-AntiMPoleCoeffs = [0, 0, 0, 0, 0];
-AntiMPoleNum = length(AntiMPoleCoeffs);
+AntiMPoleNum = 5;
+AntiMPoleCoeffs = zeros(1, AntiMPoleNum);
 
-BList = [];
-BListVec = [0; 0; 0];
+AntiFieldTestValues = [];
+AntiFieldTestEntry = zeros(3, 1);
+
 for n = 0:1:AntiMPoleNum - 1
-  TestPosComp = exp(2 * pi * i * n / AntiMPoleNum);
-  TestPosVec = [real(TestPosComp); imag(TestPosComp); 0];
-  BListVec = Bsheets(AntiSheets, TestPosVec);
-  BList = [BList, BListVec(1) + BListVec(2) * i];
+  TestPosComplex = exp(2 * pi * i * n / AntiMPoleNum);
+  TestPosVector = [real(TestPosComplex); imag(TestPosComplex); 0];
+  AntiFieldTestEntry = Bsheets(AntiSheets, TestPosVector);
+  AntiFieldTestValues = [
+    AntiFieldTestValues,
+    AntiFieldTestEntry(1) + AntiFieldTestEntry(2) * i
+  ];
 end
 
-AntiMPoleCoeffs = (fft(-conj(i * BList)) / AntiMPoleNum);
+AntiMPoleCoeffs = (fft(-conj(i * AntiFieldTestValues)) / AntiMPoleNum);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Add field recreated from multipole coefficients
+% Add antiarray field recreated from multipole coefficients
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[xgrid, ygrid] = meshgrid(
-  -(ArrayRadius - Width / 2):0.2:(ArrayRadius - Width / 2)
-);
-
-function B = magfield(c, z)
+function B = FieldFromCoeffs(c, z)
   B = zeros(size(z));
   for n = 1:length(c)
     B += c(n) * z .^ (n - 1);
@@ -106,78 +165,53 @@ function B = magfield(c, z)
   B = -conj(B * i);
 end
 
-zgrid = xgrid + ygrid * i;
-Bfield = magfield(AntiMPoleCoeffs, zgrid);
-if GraphsOn == 1
-  quiver(xgrid, ygrid, real(Bfield), imag(Bfield),
-    'LineWidth', 2, 'Color', 'b');
-end
+[ReGrid, ImGrid] = meshgrid(
+  -(ArrayRadius - Width / 2):0.2:(ArrayRadius - Width / 2)
+);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Generate a nominal array matrix with rows for cubes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-for n = 0:MagnetsNum - 1
-  cube = make_cubez(Width, 1, 1);
-  cubey = sheets_rotate_x(cube, -90);
-
-  tmp = sheets_rotate_z(cubey, -n * Multipolarity * 360 / MagnetsNum);
-  tmp = sheets_translate(tmp, [ArrayRadius; 0; 0]);
-  tmp = sheets_rotate_z(tmp, -n * 360 / MagnetsNum);
-  if n == 0
-    NomSheets = tmp;
-  else
-    NomSheets = [NomSheets; tmp];
-  end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Plot nominal array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ComplexGrid = ReGrid + ImGrid * i;
+RecreatedField = FieldFromCoeffs(AntiMPoleCoeffs, ComplexGrid);
 
 if GraphsOn == 1
-  figure
-  hold on
+  quiver(xGrid, yGrid, real(RecreatedField), imag(RecreatedField),
+    'LineWidth', 2, 'color', 'b');
 end
-
-if GraphsOn == 1
-  for m = 1:size(NomSheets, 1)
-    draw_sheets(NomSheets(m, :))
-  end
-end
-
-gridpoints = -(ArrayRadius - Width / 2):0.2:(ArrayRadius - Width / 2);
-gx = gridpoints;  gy = gx;  gz = 0;   % in xy-plane
-
-if GraphsOn == 1
-  field_from_sheets3(gx, gy, gz, NomSheets, limit)
-end
-
-axis equal
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Calculate multipole coefficients of nominal array
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-NomMPoleCoeffs = [0, 0, 0, 0, 0];
-NomMPoleNum = length(NomMPoleCoeffs);
-
-BList = [];
-BListVec = [0; 0; 0];
-for n = 0:1:NomMPoleNum - 1
-  TestPosComp = exp(2 * pi * i * n / NomMPoleNum);
-  TestPosVec = [real(TestPosComp); imag(TestPosComp); 0];
-  BListVec = Bsheets(NomSheets, TestPosVec);
-  BList = [BList, BListVec(1) + BListVec(2) * i];
-end
-
-NomMPoleCoeffs = fft(-conj(i * BList)) / NomMPoleNum;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate multipole coefficients of degraded array
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 DegMPoleCoeffs = AntiMPoleCoeffs + NomMPoleCoeffs;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plot degraded array
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if GraphsOn == 1
+  figure
+  title("Nominal Array (Red) versus Degraded Array (Black)")
+
+  hold on
+
+  for m = 1:size(NomSheets, 1)
+    draw_sheets(NomSheets(m, :))
+  end
+
+  field_from_sheets3(xGrid, yGrid, zGrid, NomSheets, limit, 'r');
+  axis equal
+  view(0, 90)
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Add degraded field recreated from multipole coefficients
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DegFieldRecreated = FieldFromCoeffs(DegMPoleCoeffs, ComplexGrid);
+
+if GraphsOn == 1
+  quiver(xGrid, yGrid, real(DegFieldRecreated), imag(DegFieldRecreated),
+    'LineWidth', 2, 'color', 'k');
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Print multipole coefficients
@@ -201,4 +235,23 @@ latex(vpa(sym(AntiMPoleCoeffsArg),3))
 latex(vpa(sym(DegMPoleCoeffsMod),3))
 latex(vpa(sym(DegMPoleCoeffsArg),3))
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plot error
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+figure
+
+GFRIndices = [];
+for i = 1:length(xGrid)
+  if abs(xGrid(i)) <= 1
+    GFRIndices = [GFRIndices, i];
+  end
+end
+
+NomField = NomFieldX + NomFieldY * i;
+Error = abs(NomField - DegFieldRecreated);
+xGridInterp = -(ArrayRadius - Width / 2):0.05:(ArrayRadius - Width / 2);
+yGridInterp = xGridInterp;
+% ErrorInterp = interp2(xGrid, yGrid, Error);
+surf(xGrid, yGrid, Error)
 

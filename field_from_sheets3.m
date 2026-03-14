@@ -1,5 +1,5 @@
 % field_drom_sheets3.m
-function field_from_sheets3(gx,gy,gz,sheets,limit)
+function [BX, BY, BZ] = field_from_sheets3(gx,gy,gz,sheets,limit,color)
 x=gx;
 y=gy;
 z=gz;
@@ -12,7 +12,7 @@ for kx=1:length(gx)
   for ky=1:length(gy)
     for kz=1:length(gz)
       xx=XX(kx,ky,kz); yy=YY(kx,ky,kz); zz=ZZ(kx,ky,kz);
-      %if (abs(xx)>a2) | (abs(yy)>a2) | (abs(zz)>a2) 
+      %if (abs(xx)>a2) | (abs(yy)>a2) | (abs(zz)>a2)
         r2=[xx;yy;zz];
         B=Bsheets(sheets,r2);
         BX(kx,ky,kz)=B(1);
@@ -23,6 +23,6 @@ for kx=1:length(gx)
   end
 end
 BX(abs(BX)>limit)=NaN; BY(abs(BY)>limit)=NaN; BZ(abs(BZ)>limit)=NaN;
-quiver3(XX,YY,ZZ,BX,BY,BZ,'LineWidth',2,'Color','r')
+quiver3(XX,YY,ZZ,BX,BY,BZ,'LineWidth',2,'Color',color)
 xlabel('x'); ylabel('y'); zlabel('z')
 set(gca,'FontSize',16)

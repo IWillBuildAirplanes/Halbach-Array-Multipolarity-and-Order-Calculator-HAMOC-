@@ -1,11 +1,3 @@
-# Note from Marcus Mason
-All MATLAB code and mathematical processes in this project belong to Volker Ziemann. I editted them for
-my own proejct on Halbach array degredation under CEBAF's radiation, but do not claim to have written
-any premise or original code for them.
-The code most modified by me was PM_multipoles. It was modifed to generate an anti-array and nominal
-array and output to the terminal the complex coefficients needed to recreate said fields.
-The rest of this README.md file was written by Volker Ziemann unless the sentence is prefaced with MXM.
-
 # PermanentMagnetDesign
 Matlab software for designing magnets with permanent magnet cubes. Used in the [course
 on that topic (1FA362)](https://ziemann.web.cern.ch/ziemann/teaching/pm21/)
